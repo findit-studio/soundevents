@@ -15,6 +15,6 @@ phf_shared = { version = "0.13", features = ["uncased"] }
 uncased = "0.9"
 proc-macro2 = "1"
 quote = "1"
-syn = "2"
+syn = "3"
 heck = "0.5"
 siphasher = "1"
