@@ -39,6 +39,34 @@ mod ontology {
   }
 
   #[test]
+  fn every_id_and_alias_resolves_case_insensitively() {
+    // Walks every key in the table rather than a sample. The perfect hash is
+    // computed by `phf_codegen` at codegen time and evaluated by `phf` at
+    // runtime, so a version skew between the two — or any change to how a key
+    // is hashed — misplaces an arbitrary subset of keys while leaving the
+    // handful named in the other tests resolving fine.
+    let ids = |s: &[&'static SoundEvent]| s.iter().map(|e| e.id()).collect::<Vec<_>>();
+
+    for event in SoundEvent::events() {
+      for key in core::iter::once(event.id()).chain(event.aliases().iter().copied()) {
+        let hits = SoundEvent::from_key(key);
+        assert!(
+          hits.iter().any(|e| e.id() == event.id()),
+          "key {key:?} did not resolve to {}",
+          event.id()
+        );
+        for variant in [key.to_ascii_lowercase(), key.to_ascii_uppercase()] {
+          assert_eq!(
+            ids(SoundEvent::from_key(&variant)),
+            ids(hits),
+            "case variant {variant:?} of {key:?} resolved differently"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
   fn unknown_returns_empty() {
     assert!(SoundEvent::from_key("definitely not a sound").is_empty());
   }
@@ -89,6 +117,31 @@ mod rated {
     let r = RatedSoundEvent::from_key("MAN SPEAKING");
     assert_eq!(r.len(), 1);
     assert_eq!(r[0].id(), "/m/05zppz");
+  }
+
+  #[test]
+  fn every_id_and_alias_resolves_case_insensitively() {
+    // See the matching `ontology` test: this is the coverage that would catch a
+    // `phf_codegen`/`phf` version skew, which moves keys without moving codes.
+    let ids = |s: &[&'static RatedSoundEvent]| s.iter().map(|e| e.id()).collect::<Vec<_>>();
+
+    for event in RatedSoundEvent::events() {
+      for key in core::iter::once(event.id()).chain(event.aliases().iter().copied()) {
+        let hits = RatedSoundEvent::from_key(key);
+        assert!(
+          hits.iter().any(|e| e.id() == event.id()),
+          "key {key:?} did not resolve to {}",
+          event.id()
+        );
+        for variant in [key.to_ascii_lowercase(), key.to_ascii_uppercase()] {
+          assert_eq!(
+            ids(RatedSoundEvent::from_key(&variant)),
+            ids(hits),
+            "case variant {variant:?} of {key:?} resolved differently"
+          );
+        }
+      }
+    }
   }
 
   #[test]

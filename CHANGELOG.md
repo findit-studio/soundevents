@@ -6,6 +6,9 @@ All notable changes to this workspace will be documented in this file.
 
 ### `soundevents-dataset`
 
+- Rebuilt the generated lookup tables against `phf` 0.14. `phf` 0.14 changes how a key is hashed, so the perfect-hash parameters in the generated static move; the key set, every sound-event code, and every `from_key` result are unchanged. `phf` does not appear in this crate's public API.
+- Raises the toolchain this crate actually builds on to Rust 1.85, because `phf` 0.14 is an edition-2024 crate declaring `rust-version = "1.85"`. The manifest still declares `rust-version = "1.59.0"`; that floor is no longer reachable and needs a decision before this version is released.
+- Added test coverage that resolves every id and every alias in both tables through `from_key`, in each ASCII case form, rather than the previous handful of sampled keys.
 - Breaking changes:
   - Sound-event codes are now `i64` instead of `u64`. `SoundEvent::encode`, `RatedSoundEvent::encode`, `from_code`, `UnknownSoundEventCode::code`, and `UnknownRatedSoundEventCode::code` all change type, and the `TryFrom<u64>` conversions become `TryFrom<i64>`.
   - Every code value changed. A code is now a 32-bit hash of the entry's id — the AudioSet MID — instead of a 64-bit hash of its display name, so it no longer moves when upstream relabels an entry, and it lands in `0..=u32::MAX`: never negative, and well inside the signed 64-bit key range that databases accept without a rebind scheme. Persisted codes must be recomputed. An id present in both views still carries the same code in each.
@@ -19,6 +22,11 @@ All notable changes to this workspace will be documented in this file.
 - Breaking changes:
   - Re-released against `soundevents-dataset` 0.3, so the `RatedSoundEvent` reachable through `ScoredEvent::event` carries the new `i64` code type.
   - Requires `ort` 2.0.0-rc.13. `ort` types are part of this crate's public API (`Options::optimization_level`, `ClassifierError::Ort`), so a downstream crate that also depends on `ort` must move to rc.13 alongside this one.
+
+### `xtask`
+
+- Moved code generation to `phf_codegen`/`phf_shared` 0.14, `syn` 3, and `prettyplease` 0.3. `phf_codegen` writes the static that `phf` reads, and `prettyplease` prints `syn`'s AST, so each pair has to move together: a generator and runtime on different `phf` versions would emit a table whose keys the runtime hashes differently, which no test of the codegen alone would catch.
+- `syn` 3 removes the second copy of `syn` from the build — `serde_derive` and `thiserror-impl` already required it, so `xtask` was compiling `syn` twice.
 
 ## 0.3.0 - 2026-04-21
 
