@@ -21,17 +21,17 @@ Typed, zero-allocation Rust access to [Google's AudioSet](https://research.googl
 
 ```toml
 [dependencies]
-soundevents-dataset = "0.2"
+soundevents-dataset = "0.3"
 ```
 
 By default this pulls in the [`rated`](#rated--audioset-rated-label-set-527-entries) module — the 527-class label set used by released AudioSet/YAMNet/VGGish models. To use the [`ontology`](#ontology--full-audioset-taxonomy-632-entries) view instead (or in addition), pick the features explicitly:
 
 ```toml
 # Just the full AudioSet ontology, no rated set.
-soundevents-dataset = { version = "0.2", default-features = false, features = ["std", "ontology"] }
+soundevents-dataset = { version = "0.3", default-features = false, features = ["std", "ontology"] }
 
 # Both views.
-soundevents-dataset = { version = "0.2", features = ["ontology"] }
+soundevents-dataset = { version = "0.3", features = ["ontology"] }
 ```
 
 ## Two views, two modules

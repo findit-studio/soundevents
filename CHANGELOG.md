@@ -4,6 +4,18 @@ All notable changes to this workspace will be documented in this file.
 
 ## Unreleased
 
+### `soundevents-dataset`
+
+- Breaking changes:
+  - Sound-event codes are now `i64` instead of `u64`. `SoundEvent::encode`, `RatedSoundEvent::encode`, `from_code`, `UnknownSoundEventCode::code`, and `UnknownRatedSoundEventCode::code` all change type, and the `TryFrom<u64>` conversions become `TryFrom<i64>`.
+  - The codes themselves are unchanged: the 64-bit name hash is reinterpreted as a signed integer, so the roughly half of the entries that hash above `i64::MAX` now read as negative. The mapping stays bijective and lookups are unaffected; only the ordering of codes changes, and hash order carries no meaning.
+  - Signed codes let a code be stored directly as a key in databases whose native integer width is signed.
+
+### `soundevents`
+
+- Breaking changes:
+  - Re-released against `soundevents-dataset` 0.3, so the `RatedSoundEvent` reachable through `ScoredEvent::event` carries the new `i64` code type.
+
 ## 0.3.0 - 2026-04-21
 
 ### `soundevents`

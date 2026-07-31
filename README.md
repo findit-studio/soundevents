@@ -31,7 +31,7 @@ Production-oriented Rust inference for [CED](https://arxiv.org/abs/2308.11957) A
 
 ```toml
 [dependencies]
-soundevents = "0.3"
+soundevents = "0.4"
 ```
 
 ## Models
@@ -71,7 +71,7 @@ sources and attribution details.
 Enable the `bundled-tiny` feature to embed `models/tiny.onnx` into your binary — useful for CLI tools and self-contained services where you don't want to ship a separate model file.
 
 ```toml
-soundevents = { version = "0.3", features = ["bundled-tiny"] }
+soundevents = { version = "0.4", features = ["bundled-tiny"] }
 ```
 
 ## Features

@@ -42,6 +42,20 @@ mod ontology {
   fn unknown_returns_empty() {
     assert!(SoundEvent::from_key("definitely not a sound").is_empty());
   }
+
+  #[test]
+  fn every_code_resolves_back_to_its_entry() {
+    for event in SoundEvent::events() {
+      let code = event.encode();
+      let resolved = SoundEvent::from_code(code)
+        .unwrap_or_else(|| panic!("code {code} for {} did not resolve", event.id()));
+      assert_eq!(
+        resolved.id(),
+        event.id(),
+        "code {code} resolved to the wrong entry"
+      );
+    }
+  }
 }
 
 #[cfg(feature = "rated")]
@@ -84,5 +98,41 @@ mod rated {
         assert!(!child.id().is_empty());
       }
     }
+  }
+
+  #[test]
+  fn every_code_resolves_back_to_its_entry() {
+    for event in RatedSoundEvent::events() {
+      let code = event.encode();
+      let resolved = RatedSoundEvent::from_code(code)
+        .unwrap_or_else(|| panic!("code {code} for {} did not resolve", event.id()));
+      assert_eq!(
+        resolved.id(),
+        event.id(),
+        "code {code} resolved to the wrong entry"
+      );
+    }
+  }
+
+  #[test]
+  fn code_above_i64_max_is_the_signed_reinterpretation() {
+    // "Female speech, woman speaking" hashes to 10035858647256678274, which is
+    // above `i64::MAX`; as an `i64` those same bits read as this negative code.
+    const FEMALE_SPEECH: i64 = -8410885426452873342;
+
+    let event = RatedSoundEvent::from_key("/m/02zsn")
+      .first()
+      .copied()
+      .expect("/m/02zsn is a rated entry");
+    assert_eq!(event.encode(), FEMALE_SPEECH);
+
+    assert_eq!(
+      RatedSoundEvent::from_code(FEMALE_SPEECH).map(RatedSoundEvent::id),
+      Some("/m/02zsn")
+    );
+
+    let resolved =
+      <&'static RatedSoundEvent>::try_from(FEMALE_SPEECH).expect("negative code resolves");
+    assert_eq!(resolved.id(), "/m/02zsn");
   }
 }

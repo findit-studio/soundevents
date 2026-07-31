@@ -39,7 +39,7 @@ struct CsvRow {
 struct EntryRecord {
   id: String,
   const_ident: syn::Ident,
-  code: u64,
+  code: i64,
   name: String,
   /// Alias variants (original casing) — stored on the struct's `aliases` field.
   alias_strings: Vec<String>,
@@ -144,7 +144,12 @@ fn build_record(tag: &RawSoundEvent) -> EntryRecord {
   let const_ident = id_to_const_name_ident(&tag.id);
   let id = tag.id.trim().to_string();
   let name = tag.name.trim().to_string();
-  let code = SipHasher::new().hash(name.as_bytes());
+  // The 64-bit name hash is reinterpreted as `i64` here, once, so every
+  // downstream use — the emitted `code` literal and the `from_code` match arm —
+  // sees the same bits. Roughly half the hashes exceed `i64::MAX` and are
+  // emitted as negative literals; the reinterpretation is bijective and the
+  // codes are only ever compared for equality, never ordered or arithmetic'd.
+  let code = SipHasher::new().hash(name.as_bytes()) as i64;
 
   // Alias variants for the struct's `aliases` field — original casing,
   // deduped within the entry by exact-string equality.
@@ -380,20 +385,20 @@ fn emit_module(
     const _: () = {
       use super::{#type_ident, #err_ident};
 
-      impl ::core::convert::TryFrom<u64> for &'static #type_ident {
+      impl ::core::convert::TryFrom<i64> for &'static #type_ident {
         type Error = #err_ident;
 
         #[cfg_attr(not(tarpaulin), inline(always))]
-        fn try_from(value: u64) -> ::core::result::Result<Self, Self::Error> {
+        fn try_from(value: i64) -> ::core::result::Result<Self, Self::Error> {
           #type_ident::from_code(value).ok_or(#err_ident(value))
         }
       }
 
-      impl ::core::convert::TryFrom<u64> for #type_ident {
+      impl ::core::convert::TryFrom<i64> for #type_ident {
         type Error = #err_ident;
 
         #[cfg_attr(not(tarpaulin), inline(always))]
-        fn try_from(value: u64) -> ::core::result::Result<Self, Self::Error> {
+        fn try_from(value: i64) -> ::core::result::Result<Self, Self::Error> {
           <&'static #type_ident>::try_from(value).cloned()
         }
       }
@@ -401,7 +406,7 @@ fn emit_module(
       impl #type_ident {
         /// Get an entry by its code, if it exists.
         #[cfg_attr(not(tarpaulin), inline(always))]
-        pub const fn from_code(id: ::core::primitive::u64) -> ::core::option::Option<&'static Self> {
+        pub const fn from_code(id: ::core::primitive::i64) -> ::core::option::Option<&'static Self> {
           ::core::option::Option::Some(match id {
             #(#from_code_arms),*,
             _ => return ::core::option::Option::None,

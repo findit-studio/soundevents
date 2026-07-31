@@ -1686,7 +1686,7 @@ mod tests {
       <&'static RatedSoundEvent>::try_from(event.encode()).expect("valid code resolves");
     assert_eq!(resolved.id(), event.id());
 
-    let err = <&'static RatedSoundEvent>::try_from(0u64).expect_err("0u64 is not a real code");
+    let err = <&'static RatedSoundEvent>::try_from(0i64).expect_err("0i64 is not a real code");
     assert_eq!(err.code(), 0);
   }
 
