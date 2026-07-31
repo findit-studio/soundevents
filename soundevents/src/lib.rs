@@ -59,6 +59,15 @@ mod graph_optimization_level {
         GraphOptimizationLevel::Level2 => Self::Level2,
         GraphOptimizationLevel::Level3 => Self::Level3,
         GraphOptimizationLevel::All => Self::All,
+        // `ort` made this enum `#[non_exhaustive]` in 2.0.0-rc.13 without adding a
+        // variant, so this arm is dead against that release and exists only for levels
+        // a later `ort` may introduce. Map them to `Disable`: it is this crate's own
+        // default (`Options::new`) and the only choice that cannot enable an
+        // optimization the caller never asked for, so an unknown level round-trips
+        // through serde as "no optimization" rather than as a graph transform this
+        // crate has never seen. Give any newly named level its own arm instead of
+        // leaving it to fall through here.
+        _ => Self::Disable,
       }
     }
   }

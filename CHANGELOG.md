@@ -13,8 +13,12 @@ All notable changes to this workspace will be documented in this file.
 
 ### `soundevents`
 
+- Fixed: the crate did not build from a clean dependency resolution. `ort = "2.0.0-rc.12"` is a caret range, and a caret on a pre-release admits later pre-releases of the same version, so a fresh resolve selected `ort` 2.0.0-rc.13 — which marked `GraphOptimizationLevel` `#[non_exhaustive]`, breaking the exhaustive `match` behind the `serde` feature with `E0004`.
+- With the `serde` feature, a graph optimization level this crate does not recognise now serializes as `disable` rather than failing to compile. `ort` 2.0.0-rc.13 adds no new levels, so no currently reachable value changes representation.
+- Enabling a combination of execution-provider features for which no prebuilt ONNX Runtime is published now fails at link time. `ort` 2.0.0-rc.13 refuses to substitute a distribution that lacks the requested providers, where rc.12 silently linked the provider-less build instead — so such a combination never delivered the providers it named, it only failed quietly. Enable just the providers published for your target, or add `ort`'s `lax-feature-matching` feature to accept a substitute.
 - Breaking changes:
   - Re-released against `soundevents-dataset` 0.3, so the `RatedSoundEvent` reachable through `ScoredEvent::event` carries the new `i64` code type.
+  - Requires `ort` 2.0.0-rc.13. `ort` types are part of this crate's public API (`Options::optimization_level`, `ClassifierError::Ort`), so a downstream crate that also depends on `ort` must move to rc.13 alongside this one.
 
 ## 0.3.0 - 2026-04-21
 
