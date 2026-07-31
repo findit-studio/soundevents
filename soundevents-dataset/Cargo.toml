@@ -1,6 +1,6 @@
 [package]
 name = "soundevents-dataset"
-version = "0.2.0"
+version = "0.3.0"
 # Intentionally kept on edition 2021 / MSRV 1.59 so this no_std static-data
 # crate remains usable from older toolchains.
 edition = "2021"
@@ -32,7 +32,7 @@ serde = ["dep:serde"]
 
 [dependencies]
 thiserror = { workspace = true, default-features = false }
-phf = { version = "0.13", default-features = false, features = ["uncased"] }
+phf = { version = "0.14", default-features = false, features = ["uncased"] }
 uncased = { version = "0.9", default-features = false }
 
 serde = { workspace = true, features = ["derive"], optional = true }

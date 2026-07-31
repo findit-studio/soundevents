@@ -118,7 +118,7 @@ macro_rules! define_sound_event {
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     pub struct $name {
       #[cfg_attr(feature = "serde", serde(skip))]
-      pub(crate) code: u64,
+      pub(crate) code: i64,
       pub(crate) id: &'static str,
       pub(crate) name: &'static str,
       #[cfg_attr(feature = "serde", serde(skip_serializing_if = "<[_]>::is_empty"))]
@@ -141,9 +141,18 @@ macro_rules! define_sound_event {
     }
 
     impl $name {
-      /// Get the unique code for the sound entry, which is a hash of its name.
+      /// Get the unique code for the sound entry, which is a hash of its id.
+      ///
+      /// The id is the entry's stable identity, so the code survives an
+      /// upstream edit to the display name. The hash is 32 bits wide and is
+      /// widened to a signed `i64` so it can be stored directly in databases
+      /// whose native integer width is signed; every code is therefore
+      /// non-negative and no larger than `u32::MAX`. Codes are unique within a
+      /// module — the code generator refuses to emit a table with a collision.
+      /// The value is an opaque identifier: compare it for equality, do not
+      /// order it or do arithmetic on it.
       #[cfg_attr(not(tarpaulin), inline(always))]
-      pub const fn encode(&self) -> u64 {
+      pub const fn encode(&self) -> i64 {
         self.code
       }
 
@@ -195,12 +204,12 @@ macro_rules! define_sound_event {
     $(#[$err_meta])*
     #[derive(Debug, ::thiserror::Error, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     #[error($err_msg)]
-    pub struct $err_name(pub(crate) u64);
+    pub struct $err_name(pub(crate) i64);
 
     impl $err_name {
       /// Get the code associated with this error.
       #[cfg_attr(not(tarpaulin), inline(always))]
-      pub const fn code(&self) -> u64 {
+      pub const fn code(&self) -> i64 {
         self.0
       }
     }

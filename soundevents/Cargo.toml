@@ -1,6 +1,6 @@
 [package]
 name = "soundevents"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2024"
 description = "Production-oriented Rust inference wrapper for CED AudioSet classifiers."
 license.workspace = true
@@ -45,7 +45,7 @@ tensorrt = ["ort/tensorrt"]
 openvino = ["ort/openvino"]
 
 [dependencies]
-ort = "2.0.0-rc.12"
+ort = "2.0.0-rc.13"
 smol_str = "0.3"
 thiserror = { workspace = true, features = ["default"] }
 
@@ -55,6 +55,20 @@ serde = { workspace = true, optional = true, features = ["derive"] }
 
 [dev-dependencies]
 serde_json = "1"
+
+# Keep this version identical to the `ort` requirement above; the two entries
+# resolve to one package and differ only in this feature.
+#
+# `--all-features` switches on every EP passthrough at once, and no prebuilt
+# ONNX Runtime ships that combination. `ort` 2.0.0-rc.13 reports the mismatch as
+# a link error, where rc.12 silently substituted the EP-less build — so the
+# combination never linked what it claimed, it just used to fail quietly. No
+# test in this workspace registers an execution provider, so the distribution
+# the test binaries link is immaterial to what they assert, and opting them back
+# into the substitution keeps `cargo test --all-features` usable. It stays in
+# `dev-dependencies` so it cannot reach a downstream build, where a silently
+# substituted distribution would be a genuine defect.
+ort = { version = "2.0.0-rc.13", features = ["lax-feature-matching"] }
 
 [lints.rust]
 rust_2018_idioms = "warn"
