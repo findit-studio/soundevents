@@ -18,8 +18,8 @@ soundevents-dataset = { version = "0.3", path = "soundevents-dataset", default-f
 
 [workspace.package]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/findit-ai/soundevents"
-homepage = "https://github.com/findit-ai/soundevents"
+repository = "https://github.com/findit-studio/soundevents"
+homepage = "https://github.com/findit-studio/soundevents"
 
 [profile.bench]
 opt-level = 3
