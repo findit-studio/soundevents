@@ -1,4 +1,7 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::{
+  collections::{HashMap, HashSet},
+  path::PathBuf,
+};
 
 use heck::{
   ToKebabCase, ToLowerCamelCase, ToShoutyKebabCase, ToShoutySnakeCase, ToShoutySnekCase,
@@ -8,9 +11,13 @@ use indexmap::{IndexMap, IndexSet};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use serde::{Deserialize, Serialize};
-use siphasher::sip::SipHasher;
 use syn::parse::{Parse, Parser};
 use uncased::UncasedStr;
+use xxhash_rust::const_xxh32::xxh32;
+
+/// Seed for the entry-code hash. Not a tuning knob: changing it rotates every
+/// code in both tables at once, so any stored code becomes unresolvable.
+const CODE_SEED: u32 = 0;
 
 /// A tag for the audioset (mirrors `ontology.json` schema).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -144,12 +151,19 @@ fn build_record(tag: &RawSoundEvent) -> EntryRecord {
   let const_ident = id_to_const_name_ident(&tag.id);
   let id = tag.id.trim().to_string();
   let name = tag.name.trim().to_string();
-  // The 64-bit name hash is reinterpreted as `i64` here, once, so every
-  // downstream use — the emitted `code` literal and the `from_code` match arm —
-  // sees the same bits. Roughly half the hashes exceed `i64::MAX` and are
-  // emitted as negative literals; the reinterpretation is bijective and the
-  // codes are only ever compared for equality, never ordered or arithmetic'd.
-  let code = SipHasher::new().hash(name.as_bytes()) as i64;
+  // The code hashes the *id* — the AudioSet MID, which is the entry's stable
+  // identity. `name` is the display label, is editable upstream, and is often a
+  // comma-joined list (`"Male speech, man speaking"`) that the alias expansion
+  // below splits apart; keying off it would rebind the code on any relabelling
+  // and orphan every stored row.
+  //
+  // The hash is 32 bits, widened losslessly to the `i64` the storage-key
+  // vocabulary accepts, so every code lands in `0..=u32::MAX`. A 64-bit hash
+  // would put roughly half the codes above `i64::MAX`, where they read back as
+  // negative literals — `Display` on the `Unknown*Code` errors prints the minus
+  // sign and the derived `Ord` inverts for exactly those entries. Pairwise
+  // distinctness is asserted per table in `emit_module`; it is not assumed.
+  let code = i64::from(xxh32(id.as_bytes(), CODE_SEED));
 
   // Alias variants for the struct's `aliases` field — original casing,
   // deduped within the entry by exact-string equality.
@@ -248,6 +262,12 @@ fn emit_module(
   let mut from_index_arms = Vec::new();
   // alias_to_consts: lowercased phf key -> set of const idents pointing at it.
   let mut alias_to_consts: IndexMap<String, IndexSet<syn::Ident>> = IndexMap::new();
+  // code -> the id that claimed it, so a hash collision names both entries.
+  // Scoped to this module: `ontology` and `rated` are two independent types
+  // with two independent `from_code` tables, so a code shared across them is
+  // not a collision — and because `rated` is a subset of `ontology` and both
+  // hash the same id, a shared entry deliberately gets the same code in both.
+  let mut claimed_codes: HashMap<i64, &str> = HashMap::new();
   let rated_indices = rated_rows.map(|rows| {
     rows
       .iter()
@@ -263,6 +283,14 @@ fn emit_module(
     let id = &record.id;
     let name = &record.name;
     let code = record.code;
+    if let Some(previous) = claimed_codes.insert(code, id.as_str()) {
+      panic!(
+        "sound-event code collision in the `{module_name}` table: ids `{previous}` and `{id}` both \
+         hash to {code}.\nDo not reseed or swap the hash to clear this — that rotates every code \
+         in both tables and orphans every code already stored downstream. Pin an explicit override \
+         for exactly one of the two ids instead, leaving every other code untouched."
+      );
+    }
     let desp = &record.description;
     let citation_uri = match &record.citation_uri {
       Some(url) => quote! { ::core::option::Option::Some(#url) },

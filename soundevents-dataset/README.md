@@ -67,11 +67,15 @@ The crate is `#![no_std]`-compatible (`default-features = false`). The entire da
 
 ## Regenerating the dataset
 
-`src/ontology/generated.rs` and `src/rated/generated.rs` are checked in and produced from `assets/ontology.json` and `assets/class_labels_indices.csv` by an `xtask` binary. After updating either source file or the codegen logic, regenerate both with one command:
+`src/ontology/generated.rs` and `src/rated/generated.rs` are checked in and produced from `assets/ontology.json` and `assets/class_labels_indices.csv` by an `xtask` binary. After updating either source file or the codegen logic, regenerate both:
 
 ```sh
-cargo xtask codegen
+cargo xtask codegen && cargo fmt --all
 ```
+
+The second step is not optional: the generator emits `prettyplease` output, which is fixed at four-space indent, while `rustfmt.toml` sets `tab_spaces = 2`. Skipping `cargo fmt` leaves a ~30,000-line whitespace diff against the checked-in tables.
+
+Each entry's `code` is a 32-bit hash of its id, and codegen panics rather than emit a table in which two ids hash to the same code.
 
 #### License
 

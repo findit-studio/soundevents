@@ -141,14 +141,16 @@ macro_rules! define_sound_event {
     }
 
     impl $name {
-      /// Get the unique code for the sound entry, which is a hash of its name.
+      /// Get the unique code for the sound entry, which is a hash of its id.
       ///
-      /// The hash is 64 bits wide and is exposed as a signed `i64` so it can
-      /// be stored directly in databases whose native integer width is signed;
-      /// codes whose hash exceeds `i64::MAX` are the two's-complement
-      /// reinterpretation of those bits and therefore read as negative. The
-      /// value is an opaque identifier — compare it for equality, do not order
-      /// it or do arithmetic on it.
+      /// The id is the entry's stable identity, so the code survives an
+      /// upstream edit to the display name. The hash is 32 bits wide and is
+      /// widened to a signed `i64` so it can be stored directly in databases
+      /// whose native integer width is signed; every code is therefore
+      /// non-negative and no larger than `u32::MAX`. Codes are unique within a
+      /// module — the code generator refuses to emit a table with a collision.
+      /// The value is an opaque identifier: compare it for equality, do not
+      /// order it or do arithmetic on it.
       #[cfg_attr(not(tarpaulin), inline(always))]
       pub const fn encode(&self) -> i64 {
         self.code

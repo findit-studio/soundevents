@@ -92,10 +92,10 @@ For low-level batching, every clip in `predict_raw_scores_batch*` / `classify_*_
 
 ## Development
 
-Regenerate the dataset from upstream sources:
+Regenerate the dataset from upstream sources (`cargo fmt` is required — the generator emits four-space `prettyplease` output while `rustfmt.toml` sets `tab_spaces = 2`):
 
 ```sh
-cargo xtask codegen
+cargo xtask codegen && cargo fmt --all
 ```
 
 Run the test suite:

@@ -17,4 +17,4 @@ proc-macro2 = "1"
 quote = "1"
 syn = "2"
 heck = "0.5"
-siphasher = "1"
+xxhash-rust = { version = "0.8", features = ["const_xxh32"] }

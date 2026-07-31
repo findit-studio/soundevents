@@ -56,6 +56,19 @@ mod ontology {
       );
     }
   }
+
+  #[test]
+  fn every_code_is_positive_and_fits_in_u32() {
+    for event in SoundEvent::events() {
+      let code = event.encode();
+      assert!(code > 0, "code {code} for {} is not positive", event.id());
+      assert!(
+        code <= i64::from(u32::MAX),
+        "code {code} for {} exceeds u32::MAX",
+        event.id()
+      );
+    }
+  }
 }
 
 #[cfg(feature = "rated")]
@@ -115,10 +128,12 @@ mod rated {
   }
 
   #[test]
-  fn code_above_i64_max_is_the_signed_reinterpretation() {
-    // "Female speech, woman speaking" hashes to 10035858647256678274, which is
-    // above `i64::MAX`; as an `i64` those same bits read as this negative code.
-    const FEMALE_SPEECH: i64 = -8410885426452873342;
+  fn code_is_the_pinned_hash_of_the_id() {
+    // The code is the 32-bit hash of the id `/m/02zsn`, not of the display
+    // name "Female speech, woman speaking" — renaming the entry upstream must
+    // not move it. Pinned as a literal so a change to the hash or to what is
+    // hashed fails here instead of silently orphaning stored codes.
+    const FEMALE_SPEECH: i64 = 1994861414;
 
     let event = RatedSoundEvent::from_key("/m/02zsn")
       .first()
@@ -132,7 +147,20 @@ mod rated {
     );
 
     let resolved =
-      <&'static RatedSoundEvent>::try_from(FEMALE_SPEECH).expect("negative code resolves");
+      <&'static RatedSoundEvent>::try_from(FEMALE_SPEECH).expect("pinned code resolves");
     assert_eq!(resolved.id(), "/m/02zsn");
+  }
+
+  #[test]
+  fn every_code_is_positive_and_fits_in_u32() {
+    for event in RatedSoundEvent::events() {
+      let code = event.encode();
+      assert!(code > 0, "code {code} for {} is not positive", event.id());
+      assert!(
+        code <= i64::from(u32::MAX),
+        "code {code} for {} exceeds u32::MAX",
+        event.id()
+      );
+    }
   }
 }

@@ -8,8 +8,8 @@ All notable changes to this workspace will be documented in this file.
 
 - Breaking changes:
   - Sound-event codes are now `i64` instead of `u64`. `SoundEvent::encode`, `RatedSoundEvent::encode`, `from_code`, `UnknownSoundEventCode::code`, and `UnknownRatedSoundEventCode::code` all change type, and the `TryFrom<u64>` conversions become `TryFrom<i64>`.
-  - The codes themselves are unchanged: the 64-bit name hash is reinterpreted as a signed integer, so the roughly half of the entries that hash above `i64::MAX` now read as negative. The mapping stays bijective and lookups are unaffected; only the ordering of codes changes, and hash order carries no meaning.
-  - Signed codes let a code be stored directly as a key in databases whose native integer width is signed.
+  - Every code value changed. A code is now a 32-bit hash of the entry's id — the AudioSet MID — instead of a 64-bit hash of its display name, so it no longer moves when upstream relabels an entry, and it lands in `0..=u32::MAX`: never negative, and well inside the signed 64-bit key range that databases accept without a rebind scheme. Persisted codes must be recomputed. An id present in both views still carries the same code in each.
+  - Code generation now refuses to emit a table containing a code collision, so uniqueness is checked at build time rather than assumed.
 
 ### `soundevents`
 
