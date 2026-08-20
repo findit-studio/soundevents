@@ -2,7 +2,15 @@
 
 All notable changes to this workspace will be documented in this file.
 
-## Unreleased
+## soundevents-dataset 0.3.1 - 2026-08-20
+
+### `soundevents-dataset`
+
+- The `rated` module's doc no longer claims blacklisted classes are excluded: 12 of the 527 released classes carry the ontology's blacklist restriction and are kept — upstream published them, and a model still scores their `index` slot. A test now pins the count so upstream drift trips it.
+- Added `is_blacklisted()`, a `const` convenience predicate beside `restrictions()`, on both `SoundEvent` and `RatedSoundEvent`.
+- `rust-version` raised `1.59.0` → `1.85`: the manifest now states the floor `phf` 0.14 already imposed, resolving the decision the 0.4.0 section below left open (0.3.0 shipped with the stale floor still declared).
+
+## 0.4.0 - 2026-07-31
 
 ### `soundevents-dataset`
 

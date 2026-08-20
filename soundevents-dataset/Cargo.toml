@@ -1,6 +1,6 @@
 [package]
 name = "soundevents-dataset"
-version = "0.3.0"
+version = "0.3.1"
 # Intentionally kept on edition 2021 / MSRV 1.59 so this no_std static-data
 # crate remains usable from older toolchains.
 edition = "2021"
@@ -12,7 +12,7 @@ homepage.workspace = true
 readme = "README.md"
 keywords = ["audioset", "sound-events", "ontology", "dataset", "no-std"]
 categories = ["data-structures", "multimedia::audio", "no-std", "no-std::no-alloc"]
-rust-version = "1.59.0"
+rust-version = "1.85"
 
 [features]
 default = ["std", "rated"]
