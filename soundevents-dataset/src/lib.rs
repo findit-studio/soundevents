@@ -198,6 +198,20 @@ macro_rules! define_sound_event {
         self.restrictions
       }
 
+      /// Return `true` if the sound entry carries an ontology
+      /// [`Restriction::Blacklist`](crate::Restriction) restriction.
+      #[cfg_attr(not(tarpaulin), inline(always))]
+      pub const fn is_blacklisted(&self) -> bool {
+        let mut i = 0;
+        while i < self.restrictions.len() {
+          if matches!(self.restrictions[i], $crate::Restriction::Blacklist) {
+            return true;
+          }
+          i += 1;
+        }
+        false
+      }
+
       $($($extra_impl)*)?
     }
 

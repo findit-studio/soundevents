@@ -152,6 +152,23 @@ mod rated {
   }
 
   #[test]
+  fn exactly_12_rated_entries_are_blacklisted() {
+    // Unlike abstract nodes, blacklisted classes are NOT excluded from the
+    // rated set — upstream still published them in `class_labels_indices.csv`,
+    // so a model's output still carries a score at their `index` slot. This
+    // pins the module doc's claim: if upstream regenerates the table and the
+    // blacklisted set drifts, this test catches it, not just the doc prose.
+    let count = RatedSoundEvent::events()
+      .iter()
+      .filter(|e| e.is_blacklisted())
+      .count();
+    assert_eq!(
+      count, 12,
+      "expected 12 blacklisted entries in the rated set"
+    );
+  }
+
+  #[test]
   fn rated_children_stay_in_rated_namespace() {
     // Pick an entry whose ontology children include unrated nodes and
     // verify that the rated view drops them. "Human sounds" is rated and
