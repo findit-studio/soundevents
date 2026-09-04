@@ -1,6 +1,6 @@
 [package]
 name = "soundevents-dataset"
-version = "0.3.1"
+version = "0.4.0"
 # Intentionally kept on edition 2021 / MSRV 1.59 so this no_std static-data
 # crate remains usable from older toolchains.
 edition = "2021"
@@ -36,6 +36,17 @@ phf = { version = "0.14", default-features = false, features = ["uncased"] }
 uncased = { version = "0.9", default-features = false }
 
 serde = { workspace = true, features = ["derive"], optional = true }
+
+[dev-dependencies]
+# `tests/ids.rs` reads `assets/sound_ids.csv` — the permanent-id ledger —
+# and checks it against the shipped tables. It must accept everything the
+# xtask writer can emit, including a mid that needs quoting, so it reads
+# with the same CSV dialect rather than a hand-rolled splitter.
+csv = "1"
+# `tests/ids.rs` pins the id's wire face: `serde(transparent)` over the
+# `#[repr(transparent)]` u16, so a stored id and a serialized one are the
+# same number.
+serde_json = "1"
 
 [package.metadata.docs.rs]
 all-features = true

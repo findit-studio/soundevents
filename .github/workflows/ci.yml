@@ -115,6 +115,65 @@ jobs:
       run: cargo install cargo-hack
     - name: Run test
       run: cargo hack test --feature-powerset
+    - name: Run xtask tests
+      # `xtask` is not a workspace default member, so the powerset above
+      # never reaches it. Its permanent-id ledger decides which
+      # `SoundEventId` every entry ships with — a public API guarantee —
+      # so its unit tests have to run somewhere. A plain `cargo test -p`
+      # sidesteps the `--feature-powerset` problem entirely.
+      run: cargo test -p xtask
+
+  # `cargo xtask codegen` must be idempotent: re-running it should leave
+  # both `generated.rs` files byte-identical to what is committed. Catches
+  # drift between `assets/` and the checked-in generated source.
+  #
+  # `assets/sound_ids.csv` — the permanent-id ledger — is checked with
+  # them, and is the more important of the two: the generator *mints* into
+  # that file, so an ontology entry with no ledger row would otherwise get
+  # an id here in CI that never reaches the repository, and the next run
+  # would mint a different one. Diffing it makes an unminted class a loud
+  # failure instead of a silently unstable id.
+  codegen-up-to-date:
+    name: codegen-up-to-date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust
+        run: rustup update stable && rustup default stable && rustup component add rustfmt
+      - name: cargo xtask codegen
+        # `cargo fmt` is part of the regeneration, not a separate tidy-up:
+        # the generator emits four-space `prettyplease` output while
+        # `rustfmt.toml` sets `tab_spaces = 2`, so skipping it would report
+        # a ~30,000-line whitespace diff as drift.
+        run: cargo run --release -p xtask -- codegen && cargo fmt --all
+      - name: generated.rs + sound_ids.csv unchanged and tracked
+        # `git status --porcelain`, not `git diff`: a ledger deleted in a
+        # commit and recreated by the codegen step above comes back
+        # UNTRACKED, which `git diff` does not report — and a recreated
+        # ledger has lost every retired id, freeing those numbers to be
+        # reminted for different classes. Untracked output must fail here.
+        run: |
+          git ls-files --error-unmatch soundevents-dataset/assets/sound_ids.csv > /dev/null || {
+            echo "::error::soundevents-dataset/assets/sound_ids.csv is not tracked. The permanent-id ledger is the only record of which ids have been handed out; it must be committed."
+            exit 1
+          }
+          # The codegen transaction lock is anchored on this file, and the
+          # anchor has to be the SAME file for every run. An untracked one
+          # can be unlinked and recreated, which leaves a holder locking an
+          # inode nobody else can reach — the lock silently stops locking
+          # and two runs can mint the same id.
+          git ls-files --error-unmatch soundevents-dataset/assets/codegen.lock > /dev/null || {
+            echo "::error::soundevents-dataset/assets/codegen.lock is not tracked. It anchors the codegen transaction lock; an untracked anchor can be replaced out from under a holder, and the lock stops excluding anything."
+            exit 1
+          }
+          PATHS="soundevents-dataset/src/ontology/generated.rs soundevents-dataset/src/rated/generated.rs soundevents-dataset/assets/sound_ids.csv"
+          DRIFT=$(git status --porcelain -- $PATHS)
+          if [ -n "$DRIFT" ]; then
+            echo "::error::the generated tables / sound_ids.csv are out of sync with assets/ — run 'cargo xtask codegen && cargo fmt --all' and commit the result."
+            echo "$DRIFT"
+            git diff -- $PATHS
+            exit 1
+          fi
 
   coverage:
     name: coverage

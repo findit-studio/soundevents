@@ -20,7 +20,7 @@ Production-oriented Rust inference for [CED](https://arxiv.org/abs/2308.11957) A
 ## Highlights
 
 - **Drop-in CED inference** — load any [CED](https://arxiv.org/abs/2308.11957) AudioSet ONNX model (or use the bundled `tiny` variant) and run it directly on `&[f32]` PCM samples. No Python, no preprocessing pipeline.
-- **Typed labels, not bare integers** — every prediction comes back as an [`EventPrediction`] carrying a `&'static RatedSoundEvent` from [`soundevents-dataset`](./soundevents-dataset), so you get the canonical AudioSet name, the `/m/...` id, the model class index, and the confidence in one struct.
+- **Typed labels, not bare integers** — every prediction comes back as an [`EventPrediction`] carrying a `&'static RatedSoundEvent` from [`soundevents-dataset`](./soundevents-dataset), so you get the canonical AudioSet name, the permanent `SoundEventId` to store, the `/m/...` mid, the model class index, and the confidence in one struct.
 - **Compile-time class-count guarantee** — the `NUM_CLASSES = 527` constant comes from the rated dataset at codegen time. If a model returns the wrong number of classes you get a typed [`ClassifierError::UnexpectedClassCount`] instead of a silent mismatch.
 - **Long-clip chunking built in** — `classify_chunked` / `classify_all_chunked` window the input at a configurable hop, run inference on each chunk, and aggregate the per-chunk confidences with either `Mean` or `Max`. Defaults match CED's 10 s training window (160 000 samples at 16 kHz), and fixed-size chunk batches can now be packed into one model call.
 - **Top-k via a tiny min-heap** — `classify(samples, k)` does not allocate a full 527-element scores vector to find the top results.
@@ -31,7 +31,7 @@ Production-oriented Rust inference for [CED](https://arxiv.org/abs/2308.11957) A
 
 ```toml
 [dependencies]
-soundevents = "0.4"
+soundevents = "0.5"
 ```
 
 ## Models
@@ -71,7 +71,7 @@ sources and attribution details.
 Enable the `bundled-tiny` feature to embed `models/tiny.onnx` into your binary — useful for CLI tools and self-contained services where you don't want to ship a separate model file.
 
 ```toml
-soundevents = { version = "0.4", features = ["bundled-tiny"] }
+soundevents = { version = "0.5", features = ["bundled-tiny"] }
 ```
 
 ## Features
