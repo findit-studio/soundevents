@@ -7,7 +7,7 @@ mod ontology {
   #[test]
   fn ontology_count_matches_upstream() {
     // SoundEvent::from_code is generated from every entry, so we can count
-    // distinct ids reachable through EVENTS as a sanity check.
+    // distinct mids reachable through EVENTS as a sanity check.
     assert_eq!(
       SoundEvent::events().len(),
       632,
@@ -29,7 +29,7 @@ mod ontology {
     ] {
       let r = SoundEvent::from_key(q);
       assert_eq!(r.len(), 1, "expected 1 ontology match for {q:?}");
-      assert_eq!(r[0].id(), "/m/05zppz");
+      assert_eq!(r[0].mid(), "/m/05zppz");
     }
   }
 
@@ -39,26 +39,26 @@ mod ontology {
   }
 
   #[test]
-  fn every_id_and_alias_resolves_case_insensitively() {
+  fn every_mid_and_alias_resolves_case_insensitively() {
     // Walks every key in the table rather than a sample. The perfect hash is
     // computed by `phf_codegen` at codegen time and evaluated by `phf` at
     // runtime, so a version skew between the two — or any change to how a key
     // is hashed — misplaces an arbitrary subset of keys while leaving the
     // handful named in the other tests resolving fine.
-    let ids = |s: &[&'static SoundEvent]| s.iter().map(|e| e.id()).collect::<Vec<_>>();
+    let mids = |s: &[&'static SoundEvent]| s.iter().map(|e| e.mid()).collect::<Vec<_>>();
 
     for event in SoundEvent::events() {
-      for key in core::iter::once(event.id()).chain(event.aliases().iter().copied()) {
+      for key in core::iter::once(event.mid()).chain(event.aliases().iter().copied()) {
         let hits = SoundEvent::from_key(key);
         assert!(
-          hits.iter().any(|e| e.id() == event.id()),
+          hits.iter().any(|e| e.mid() == event.mid()),
           "key {key:?} did not resolve to {}",
-          event.id()
+          event.mid()
         );
         for variant in [key.to_ascii_lowercase(), key.to_ascii_uppercase()] {
           assert_eq!(
-            ids(SoundEvent::from_key(&variant)),
-            ids(hits),
+            mids(SoundEvent::from_key(&variant)),
+            mids(hits),
             "case variant {variant:?} of {key:?} resolved differently"
           );
         }
@@ -76,10 +76,10 @@ mod ontology {
     for event in SoundEvent::events() {
       let code = event.encode();
       let resolved = SoundEvent::from_code(code)
-        .unwrap_or_else(|| panic!("code {code} for {} did not resolve", event.id()));
+        .unwrap_or_else(|| panic!("code {code} for {} did not resolve", event.mid()));
       assert_eq!(
-        resolved.id(),
-        event.id(),
+        resolved.mid(),
+        event.mid(),
         "code {code} resolved to the wrong entry"
       );
     }
@@ -89,11 +89,11 @@ mod ontology {
   fn every_code_is_positive_and_fits_in_u32() {
     for event in SoundEvent::events() {
       let code = event.encode();
-      assert!(code > 0, "code {code} for {} is not positive", event.id());
+      assert!(code > 0, "code {code} for {} is not positive", event.mid());
       assert!(
         code <= i64::from(u32::MAX),
         "code {code} for {} exceeds u32::MAX",
-        event.id()
+        event.mid()
       );
     }
   }
@@ -116,27 +116,27 @@ mod rated {
   fn lookup_is_case_insensitive() {
     let r = RatedSoundEvent::from_key("MAN SPEAKING");
     assert_eq!(r.len(), 1);
-    assert_eq!(r[0].id(), "/m/05zppz");
+    assert_eq!(r[0].mid(), "/m/05zppz");
   }
 
   #[test]
-  fn every_id_and_alias_resolves_case_insensitively() {
+  fn every_mid_and_alias_resolves_case_insensitively() {
     // See the matching `ontology` test: this is the coverage that would catch a
     // `phf_codegen`/`phf` version skew, which moves keys without moving codes.
-    let ids = |s: &[&'static RatedSoundEvent]| s.iter().map(|e| e.id()).collect::<Vec<_>>();
+    let mids = |s: &[&'static RatedSoundEvent]| s.iter().map(|e| e.mid()).collect::<Vec<_>>();
 
     for event in RatedSoundEvent::events() {
-      for key in core::iter::once(event.id()).chain(event.aliases().iter().copied()) {
+      for key in core::iter::once(event.mid()).chain(event.aliases().iter().copied()) {
         let hits = RatedSoundEvent::from_key(key);
         assert!(
-          hits.iter().any(|e| e.id() == event.id()),
+          hits.iter().any(|e| e.mid() == event.mid()),
           "key {key:?} did not resolve to {}",
-          event.id()
+          event.mid()
         );
         for variant in [key.to_ascii_lowercase(), key.to_ascii_uppercase()] {
           assert_eq!(
-            ids(RatedSoundEvent::from_key(&variant)),
-            ids(hits),
+            mids(RatedSoundEvent::from_key(&variant)),
+            mids(hits),
             "case variant {variant:?} of {key:?} resolved differently"
           );
         }
@@ -175,10 +175,10 @@ mod rated {
     // has many children, some abstract.
     let entries = RatedSoundEvent::from_key("Human sounds");
     if let Some(e) = entries.first() {
-      // Just walk the children; if codegen left a stale id reference,
+      // Just walk the children; if codegen left a stale mid reference,
       // this would fail to compile.
       for child in e.children() {
-        assert!(!child.id().is_empty());
+        assert!(!child.mid().is_empty());
       }
     }
   }
@@ -188,18 +188,18 @@ mod rated {
     for event in RatedSoundEvent::events() {
       let code = event.encode();
       let resolved = RatedSoundEvent::from_code(code)
-        .unwrap_or_else(|| panic!("code {code} for {} did not resolve", event.id()));
+        .unwrap_or_else(|| panic!("code {code} for {} did not resolve", event.mid()));
       assert_eq!(
-        resolved.id(),
-        event.id(),
+        resolved.mid(),
+        event.mid(),
         "code {code} resolved to the wrong entry"
       );
     }
   }
 
   #[test]
-  fn code_is_the_pinned_hash_of_the_id() {
-    // The code is the 32-bit hash of the id `/m/02zsn`, not of the display
+  fn code_is_the_pinned_hash_of_the_mid() {
+    // The code is the 32-bit hash of the mid `/m/02zsn`, not of the display
     // name "Female speech, woman speaking" — renaming the entry upstream must
     // not move it. Pinned as a literal so a change to the hash or to what is
     // hashed fails here instead of silently orphaning stored codes.
@@ -212,24 +212,24 @@ mod rated {
     assert_eq!(event.encode(), FEMALE_SPEECH);
 
     assert_eq!(
-      RatedSoundEvent::from_code(FEMALE_SPEECH).map(RatedSoundEvent::id),
+      RatedSoundEvent::from_code(FEMALE_SPEECH).map(RatedSoundEvent::mid),
       Some("/m/02zsn")
     );
 
     let resolved =
       <&'static RatedSoundEvent>::try_from(FEMALE_SPEECH).expect("pinned code resolves");
-    assert_eq!(resolved.id(), "/m/02zsn");
+    assert_eq!(resolved.mid(), "/m/02zsn");
   }
 
   #[test]
   fn every_code_is_positive_and_fits_in_u32() {
     for event in RatedSoundEvent::events() {
       let code = event.encode();
-      assert!(code > 0, "code {code} for {} is not positive", event.id());
+      assert!(code > 0, "code {code} for {} is not positive", event.mid());
       assert!(
         code <= i64::from(u32::MAX),
         "code {code} for {} exceeds u32::MAX",
-        event.id()
+        event.mid()
       );
     }
   }

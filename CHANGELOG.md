@@ -2,6 +2,25 @@
 
 All notable changes to this workspace will be documented in this file.
 
+## soundevents 0.5.0 / soundevents-dataset 0.4.0 - 2026-09-04
+
+### `soundevents-dataset`
+
+- Every entry now carries a `SoundEventId` — a permanent `u16` handle a database column, a search index, or a wire message can store and resolve back with `SoundEvent::from_id` / `RatedSoundEvent::from_id`. The pair (`id`, `from_id`) is a bijection onto the ids a view carries, so a downstream store no longer has to mint an identifier of its own for an AudioSet class. `from_id` is total over `u16`: unassigned ids, ids retired by a past revision, the reserved 0, and — in the `rated` view — ids held by ontology-only classes all answer `None` rather than a neighbouring class.
+- The assignment lives in `assets/sound_ids.csv`, the permanent-id ledger, keyed on the AudioSet mid. It spans the full ontology and the `rated` view draws from it, so a class present in both carries one and the same id in each. Every row is load-bearing, retired ones included: a tombstone is the only record that its number was spent, so the ledger only ever grows and is never regenerated. Codegen refuses a missing or emptied ledger outright — no flag overrides it, and an emptied one is refused even by the genesis path, because a file with no rows is a lost ledger wearing a header rather than a new one. Creating the ledger is a separate `cargo xtask bootstrap-ledger` command that first proves the dataset has never shipped an id: the ledger must be absent, not merely empty, and neither committed table may already carry ids. Codegen also refuses a run that both retires and mints — what an upstream re-midding would look like from here — until the operator resolves it in place or passes `--allow-retire-and-mint`. The rewritten ledger is installed as a transaction: codegen holds an exclusive lock across reading the ledger, minting into it and emitting the tables, and the install itself is staged beside the file, synced, checked to read back as itself, refused if the ledger changed on disk since this run read it, and only then renamed over it and made durable. All of that guards one failure mode — a ledger that is half-written or written from a stale snapshot still parses, silently drops the highest ids, and frees spent numbers to be minted again for other classes, with every other guard silent.
+- `tests/ids.rs` pins the whole discipline: the bijection, `from_id`'s totality over `u16`, one fingerprint per view over the shipped `(id, mid)` assignment, and a separate fingerprint over every ledger row including tombstones — which the view pins structurally cannot see. Both kinds of pin have a falsification probe that breaks the assignment on purpose and asserts the pin moves.
+- CI gained a `codegen-up-to-date` job (there was none) and a `cargo test -p xtask` step. The former checks the ledger with `git status --porcelain` and `git ls-files --error-unmatch` rather than `git diff`, because a ledger deleted in a commit and recreated by codegen comes back untracked — which `git diff` does not report, and a recreated ledger has lost every retired id. The latter runs xtask's own tests, which the `--feature-powerset` matrix never reaches because xtask is not a workspace default member.
+- Breaking changes:
+  - `id()` now returns the new `SoundEventId`. The AudioSet machine id it used to return is available as `mid()`, on both `SoundEvent` and `RatedSoundEvent`; the struct field was renamed to match, so under the `serde` feature that column serializes as `mid` and a serialized entry now also carries `id`. **Both accessors are callable in the same expression positions**, so code that only formats the value keeps compiling while changing meaning — audit every `.id()` call site rather than relying on the compiler.
+  - The `code` (`encode()` / `from_code`) is unchanged and still resolves, but is no longer the recommended handle for anything persisted: it is *derived* from the mid, so it cannot outlive a change to one, where an id can be held to its class by editing a single ledger row.
+
+### `soundevents`
+
+- `EventPrediction` gained `id()`, forwarding the class's permanent `SoundEventId` — the handle to store when a prediction outlives the process that made it, unlike `index()`, which is a position in this model's output vector and moves whenever upstream retrains.
+- Breaking changes:
+  - `EventPrediction::id()` used to return the AudioSet machine id; that is now `mid()`. See the note above — the substitution is not always a compile error.
+  - Re-released against `soundevents-dataset` 0.4, so the `RatedSoundEvent` reachable through `ScoredEvent::event` carries the new `id` field and answers `mid()` where it used to answer `id()`. `soundevents-dataset` is part of this crate's public API (`ScoredEvent::event`, `EventPrediction::event`), so a downstream crate that also depends on it directly must move to 0.4 alongside this one.
+
 ## soundevents-dataset 0.3.1 - 2026-08-20
 
 ### `soundevents-dataset`

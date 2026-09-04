@@ -1,0 +1,19 @@
+This file is the anchor for the codegen transaction lock. It carries no
+data and is never read or written by any program: `cargo xtask codegen`
+takes an exclusive OS lock on it for the length of one run, so two runs
+cannot both mint permanent sound-event ids from the same high-water mark
+in `sound_ids.csv` and lose one another's assignments.
+
+It is committed, and that is the point. A lock taken on an untracked
+sibling can be unlinked and recreated by anything, leaving a holder
+locking an inode nobody else can reach - the lock silently stops
+locking. Committed, its removal is a visible change and CI fails on it.
+
+It is also deliberately a file nothing reads. Windows file locks are
+mandatory, so a locked range cannot be read back even by the locking
+process through a second handle; anchoring the lock on an input the run
+reads - `ontology.json`, say - would break every Windows run at its
+first read.
+
+Do not delete it, do not write to it, and do not point the lock at a
+file that codegen actually reads.

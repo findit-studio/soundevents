@@ -21,17 +21,17 @@ Typed, zero-allocation Rust access to [Google's AudioSet](https://research.googl
 
 ```toml
 [dependencies]
-soundevents-dataset = "0.3"
+soundevents-dataset = "0.4"
 ```
 
 By default this pulls in the [`rated`](#rated--audioset-rated-label-set-527-entries) module — the 527-class label set used by released AudioSet/YAMNet/VGGish models. To use the [`ontology`](#ontology--full-audioset-taxonomy-632-entries) view instead (or in addition), pick the features explicitly:
 
 ```toml
 # Just the full AudioSet ontology, no rated set.
-soundevents-dataset = { version = "0.3", default-features = false, features = ["std", "ontology"] }
+soundevents-dataset = { version = "0.4", default-features = false, features = ["std", "ontology"] }
 
 # Both views.
-soundevents-dataset = { version = "0.3", features = ["ontology"] }
+soundevents-dataset = { version = "0.4", features = ["ontology"] }
 ```
 
 ## Two views, two modules
@@ -41,15 +41,57 @@ soundevents-dataset = { version = "0.3", features = ["ontology"] }
 | [`rated`](#rated--audioset-rated-label-set-527-entries) | `class_labels_indices.csv` | **527** | You're working with model outputs / multi-hot label tensors. Each entry carries its `index` so the position in a 527-vector resolves to a name in `O(1)`. |
 | [`ontology`](#ontology--full-audioset-taxonomy-632-entries) | `ontology.json` | **632** | You need the full taxonomy, including abstract container nodes (`"Human voice"`, `"Music"`, …) and the 105 entries that aren't in the released rated set. |
 
-The two are independent: each lives in its own module, has its own `&'static` consts, its own perfect-hash map, and its own type (`SoundEvent` vs `RatedSoundEvent`). Enable only what you need to keep the binary small.
+The two are independent: each lives in its own module, has its own `&'static` consts, its own perfect-hash map, and its own type (`SoundEvent` vs `RatedSoundEvent`). Enable only what you need to keep the binary small. They do share one thing — the permanent ids below, which span the full ontology, so a class in both views carries the same id in each.
+
+## Permanent ids
+
+Every entry carries a `SoundEventId` — a permanent, stable `u16` handle you can store now and resolve back later:
+
+```rust
+# #[cfg(feature = "rated")]
+# fn main() {
+use soundevents_dataset::{RatedSoundEvent, SoundEventId};
+
+let event = RatedSoundEvent::from_key("Speech")[0];
+let stored: u16 = event.id().get();   // → a database column, a wire field
+
+let recovered = RatedSoundEvent::from_id(SoundEventId::new(stored)).expect("assigned id");
+assert_eq!(recovered.mid(), event.mid());
+
+// 0 is never assigned, so a zeroed column fails to resolve.
+assert!(RatedSoundEvent::from_id(SoundEventId::new(0)).is_none());
+# }
+# #[cfg(not(feature = "rated"))]
+# fn main() {}
+```
+
+`id` and `from_id` are a bijection onto the ids a view carries, so a downstream store never has to mint an identifier of its own — it keeps two bytes and looks the entry back up. `from_id` is total: an id the view does not carry answers `None`, never a neighbouring class.
+
+The ids obey one discipline, and it is what makes them worth storing:
+
+- An id is assigned once and **never changes**. Correcting an entry's display name, description, citation, children or restrictions keeps its id.
+- A **dropped class's id is never reused** — `from_id` answers `None` for it forever after.
+- A **new class mints a fresh id**, above every id ever assigned.
+
+Ids start at 1, so a zeroed column never resolves.
+
+Three things an id is deliberately *not*:
+
+| | |
+| --- | --- |
+| the AudioSet **mid** (`mid()`) | Upstream's identifier, kept as provenance. It is the ledger's join key, but it is a string — wider on the wire, wider as a column, and unordered. |
+| the **code** (`encode()`) | A 32-bit hash *derived* from the mid, so it cannot outlive a change to one. An id is assigned, so it can. |
+| the **model output index** (`index()`, `rated` only) | A position in a released model's output vector. It moves whenever upstream retrains. |
+
+The assignment lives in [`assets/sound_ids.csv`](./assets/sound_ids.csv) — the ledger the codegen reads, extends, and rewrites, and the reviewable form of what the generated tables ship. `tests/ids.rs` pins the complete assignment and CI re-runs the codegen, so a regeneration that renumbers anything fails loudly.
 
 ### `rated` — AudioSet rated label set (527 entries)
 
-`RatedSoundEvent` exposes the same metadata accessors as `SoundEvent` (`id`, `name`, `description`, `aliases`, `citation_uri`, `children`, `restrictions`) plus a rated-only [`index()`](https://docs.rs/soundevents-dataset) — the integer 0..527 used as the position in released AudioSet models' output vectors. Walking `children()` stays inside the rated namespace: any ontology child that is *not* in the rated set is dropped, so the hierarchy remains self-consistent.
+`RatedSoundEvent` exposes the same metadata accessors as `SoundEvent` (`id`, `mid`, `name`, `description`, `aliases`, `citation_uri`, `children`, `restrictions`) plus a rated-only [`index()`](https://docs.rs/soundevents-dataset) — the integer 0..527 used as the position in released AudioSet models' output vectors. Walking `children()` stays inside the rated namespace: any ontology child that is *not* in the rated set is dropped, so the hierarchy remains self-consistent.
 
 ### Case-insensitive, separator-distinct lookup
 
-`from_key` is keyed by [`UncasedStr`](https://docs.rs/uncased), so any case form of an alias resolves to the same entry without us having to enumerate every possibility:
+`from_key` is keyed by [`UncasedStr`](https://docs.rs/uncased), so any case form of a mid or alias resolves to the same entry without us having to enumerate every possibility:
 
 Separator styles are still indexed independently (`"man speaking"` ≠ `"man_speaking"` ≠ `"man-speaking"` ≠ `"manSpeaking"`), so you only pay for the four shapes the codegen actually emits — every case variant of each shape collapses into one phf bucket.
 
@@ -75,7 +117,21 @@ cargo xtask codegen && cargo fmt --all
 
 The second step is not optional: the generator emits `prettyplease` output, which is fixed at four-space indent, while `rustfmt.toml` sets `tab_spaces = 2`. Skipping `cargo fmt` leaves a ~30,000-line whitespace diff against the checked-in tables.
 
-Each entry's `code` is a 32-bit hash of its id, and codegen panics rather than emit a table in which two ids hash to the same code.
+Each entry's `code` is a 32-bit hash of its mid, and codegen panics rather than emit a table in which two mids hash to the same code.
+
+Codegen also resolves each entry's permanent id against `assets/sound_ids.csv`, minting fresh ids above the high-water mark for mids the ledger has never seen and rewriting it. **The ledger is an input, not an output** — ids already assigned never move, and a class dropped from the ontology keeps its row, retired, so its number is never handed out again. Every row is load-bearing: a retired one is the only record that its id was spent, so the file only ever grows and is never regenerated from scratch.
+
+A missing or emptied ledger is an unconditional hard error, and an emptied one is refused even by the genesis path below: a file with no rows is a *lost* ledger wearing a header, not a new one, and accepting it would remint the whole dataset from 1 and lose every retired id. Restore it from version control.
+
+One escape hatch, off by default because the safe behavior is to stop and ask:
+
+| Flag | When codegen refuses without it |
+| --- | --- |
+| `--allow-retire-and-mint` | One run both retires a mid and mints another. That is what upstream *re-midding* a class it kept would look like from here, and minting would break every id already stored for it. Fix it in place — edit the mid in the ledger, keeping its id — or pass this to say the two events are unrelated. |
+
+Creating the ledger is a separate one-shot command, `cargo xtask bootstrap-ledger`, and never a flag on a normal run — on the normal path a *lost* ledger is indistinguishable from a never-created one, and minting would restart at 1 in the current ontology order, handing numbers already in databases to different classes with every other guard silent. It refuses unless the dataset has demonstrably never shipped an id: the ledger must be **absent** rather than empty, and neither committed `generated.rs` may already carry ids.
+
+CI's `codegen-up-to-date` job re-runs the xtask and fails if either generated file or `sound_ids.csv` changes or goes untracked — guaranteeing no drift between `assets/` and the committed source, and catching a class whose id was minted in CI rather than committed. `tests/ids.rs` pins the ledger separately, retired rows included, because a lost tombstone is invisible to everything else: the tables, the generated files and the codegen diff all agree with the shortened ledger.
 
 #### License
 

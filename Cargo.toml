@@ -14,7 +14,7 @@ resolver = "3"
 thiserror = { version = "2", default-features = false }
 serde = "1"
 
-soundevents-dataset = { version = "0.3", path = "soundevents-dataset", default-features = false }
+soundevents-dataset = { version = "0.4", path = "soundevents-dataset", default-features = false }
 
 [workspace.package]
 license = "MIT OR Apache-2.0"

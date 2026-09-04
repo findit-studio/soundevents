@@ -9,7 +9,7 @@ use ort::{
   value::TensorRef,
 };
 use smol_str::SmolStr;
-use soundevents_dataset::RatedSoundEvent;
+use soundevents_dataset::{RatedSoundEvent, SoundEventId};
 use std::{
   cmp::{Ordering, Reverse},
   collections::BinaryHeap,
@@ -439,10 +439,24 @@ impl EventPrediction {
     self.event().name()
   }
 
-  /// Stable AudioSet identifier such as `"/m/09x0r"`.
+  /// The class's permanent [`SoundEventId`] — the handle to store when a
+  /// prediction outlives the process that made it.
+  ///
+  /// Unlike [`Self::index`], which is a position in *this* model's output
+  /// vector and moves whenever upstream retrains, an id is assigned once
+  /// and never changes.
   #[cfg_attr(not(tarpaulin), inline(always))]
-  pub const fn id(&self) -> &'static str {
+  pub const fn id(&self) -> SoundEventId {
     self.event().id()
+  }
+
+  /// The class's AudioSet machine id, such as `"/m/09x0r"`.
+  ///
+  /// Upstream's identifier for the class — provenance, not a storage
+  /// handle. Store [`Self::id`] instead.
+  #[cfg_attr(not(tarpaulin), inline(always))]
+  pub const fn mid(&self) -> &'static str {
+    self.event().mid()
   }
 
   /// Confidence after applying a sigmoid to the model output.
@@ -1105,8 +1119,8 @@ mod tests {
   fn rated_indices_round_trip() {
     for event in RatedSoundEvent::events() {
       assert_eq!(
-        RatedSoundEvent::from_index(event.index()).map(RatedSoundEvent::id),
-        Some(event.id())
+        RatedSoundEvent::from_index(event.index()).map(RatedSoundEvent::mid),
+        Some(event.mid())
       );
     }
   }
@@ -1341,12 +1355,13 @@ mod tests {
   }
 
   #[test]
-  fn event_prediction_exposes_name_and_id() {
+  fn event_prediction_exposes_name_mid_and_id() {
     let prediction = EventPrediction::from_confidence(0, 0.25).expect("rated event for class 0");
     assert_eq!(prediction.confidence(), 0.25);
     assert_eq!(prediction.index(), 0);
     let event = RatedSoundEvent::from_index(0).unwrap();
     assert_eq!(prediction.name(), event.name());
+    assert_eq!(prediction.mid(), event.mid());
     assert_eq!(prediction.id(), event.id());
     assert_eq!(prediction.event().id(), event.id());
   }
@@ -1693,7 +1708,7 @@ mod tests {
     let event = RatedSoundEvent::from_index(0).expect("class 0 exists");
     let resolved: &'static RatedSoundEvent =
       <&'static RatedSoundEvent>::try_from(event.encode()).expect("valid code resolves");
-    assert_eq!(resolved.id(), event.id());
+    assert_eq!(resolved.mid(), event.mid());
 
     let err = <&'static RatedSoundEvent>::try_from(0i64).expect_err("0i64 is not a real code");
     assert_eq!(err.code(), 0);
